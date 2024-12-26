@@ -12,16 +12,16 @@ func main() {
 	http.HandleFunc("/view/", viewHandler)
 	http.HandleFunc("/edit/", editHandler)
 	http.HandleFunc("/save/", saveHandler)
-	http.HandleFunc("/error/", errorHandler)
 	log.Fatal(http.ListenAndServe(":4000", nil))
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Path[len("/view/"):]
+	fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Viewing title: "+title)
 	p, err := LoadPage(title)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load page: %s\n", err.Error())
-		http.Redirect(w, r, "/error/not-found", http.StatusTemporaryRedirect)
+		fmt.Fprintf(os.Stderr, "[ERROR] Failed to load page: %s\n", err.Error())
+		renderError("not-found", w, err)
 		return
 	}
 	renderTemplate(w, "view", p)
@@ -29,6 +29,7 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 
 func editHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Path[len("/edit/"):]
+	fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Editing title: "+title)
 	p, err := LoadPage(title)
 	if err != nil {
 		p = &Page{Title: title}
@@ -38,14 +39,18 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 
 func saveHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Path[len("/save/"):]
+	fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Saving title: "+title)
 	body := r.FormValue("body")
 	p := &Page{Title: title, Body: []byte(body)}
 	err := p.Save()
 	if err != nil {
-		http.Redirect(w, r, "/error/internal-error", http.StatusTemporaryRedirect)
+		fmt.Fprintf(os.Stderr, "[ERROR] Failed to save page: %s\n", err.Error())
+		renderError("internal-error", w, err)
 		return
 	}
-	renderTemplate(w, "view", p)
+	fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Redirecting to view/"+title)
+	http.Redirect(w, r, "/view/"+title, http.StatusPermanentRedirect)
+	// renderTemplate(w, "view", p)
 }
 
 func renderTemplate(w http.ResponseWriter, tName string, p *Page) {
@@ -54,17 +59,28 @@ func renderTemplate(w http.ResponseWriter, tName string, p *Page) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	t.Execute(w, p)
+	err = t.Execute(w, p)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
-func errorHandler(w http.ResponseWriter, r *http.Request) {
+func renderError(name string, w http.ResponseWriter, e error) {
 	var responseCodes map[string]int = map[string]int{
 		"not-found":      http.StatusNotFound,
 		"internal-error": http.StatusInternalServerError,
 	}
-	eName := r.URL.Path[len("/error/"):]
-	t, _ := template.ParseFiles("templates/error/" + eName + ".html")
-	status := responseCodes[eName]
+	status, ok := responseCodes[name]
+	if !ok {
+		errMsg := "error " + name + " does not have an appropriate status code"
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
+	t, err := template.ParseFiles("templates/error/" + name + ".html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(status)
-	t.Execute(w, Page{})
+	t.Execute(w, struct{ Message string }{Message: e.Error()})
 }
