@@ -3,10 +3,14 @@ package main
 import (
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 )
+
+var templates = readTemplates("./templates")
 
 func main() {
 	http.HandleFunc("/view/", viewHandler)
@@ -50,37 +54,47 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Redirecting to view/"+title)
 	http.Redirect(w, r, "/view/"+title, http.StatusPermanentRedirect)
-	// renderTemplate(w, "view", p)
 }
 
 func renderTemplate(w http.ResponseWriter, tName string, p *Page) {
-	t, err := template.ParseFiles("templates/" + tName + ".html")
+	err := templates.ExecuteTemplate(w, tName+".html", p)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = t.Execute(w, p)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		renderError("internal-error", w, err)
 	}
 }
 
 func renderError(name string, w http.ResponseWriter, e error) {
+	fmt.Fprintf(os.Stderr, "[ERROR] %+v\n", e)
 	var responseCodes map[string]int = map[string]int{
 		"not-found":      http.StatusNotFound,
 		"internal-error": http.StatusInternalServerError,
 	}
 	status, ok := responseCodes[name]
 	if !ok {
-		errMsg := "error " + name + " does not have an appropriate status code"
+		errMsg := fmt.Sprintf("[ERROR] %s does not have an appropriate status code", name)
+		fmt.Fprint(os.Stderr, errMsg)
 		http.Error(w, errMsg, http.StatusInternalServerError)
 		return
 	}
-	t, err := template.ParseFiles("templates/error/" + name + ".html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	w.WriteHeader(status)
-	t.Execute(w, BlogError{Message: e.Error()})
+	err := templates.ExecuteTemplate(w, name+".html", BlogError{Message: e.Error()})
+	if err != nil {
+		errMsg := fmt.Sprintf("[ERROR] template execution error for %s : %s\n", name+".html", err.Error())
+		fmt.Fprint(os.Stderr, errMsg)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+	}
+}
+
+func readTemplates(root string) *template.Template {
+	templateNames := make([]string, 0, 10)
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if !d.IsDir() {
+			templateNames = append(templateNames, path)
+		}
+		return err
+	})
+	if err != nil {
+		log.Fatalf("[ERROR] Failed to read app templates: %s\n", err.Error())
+	}
+	return template.Must(template.ParseFiles(templateNames...))
 }
