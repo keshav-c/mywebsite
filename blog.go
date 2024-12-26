@@ -82,5 +82,5 @@ func renderError(name string, w http.ResponseWriter, e error) {
 		return
 	}
 	w.WriteHeader(status)
-	t.Execute(w, struct{ Message string }{Message: e.Error()})
+	t.Execute(w, BlogError{Message: e.Error()})
 }
