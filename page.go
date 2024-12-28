@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"strings"
 )
@@ -28,11 +28,11 @@ func LoadPage(title string) (*Page, error) {
 func (p *Page) Validate() error {
 	title := strings.TrimSpace(p.Title)
 	if len(title) == 0 {
-		return fmt.Errorf("Page Title cannot be empty")
+		return errors.New("Page Title cannot be empty")
 	}
 	body := strings.TrimSpace(string(p.Body))
 	if len(body) == 0 {
-		return fmt.Errorf("Page Body cannot be empty")
+		return errors.New("Page Body cannot be empty")
 	}
 	return nil
 }

@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 var templates = readTemplates("./templates")
+var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9-]+)$")
 
 func main() {
 	http.HandleFunc("/view/", viewHandler)
@@ -19,8 +21,20 @@ func main() {
 	log.Fatal(http.ListenAndServe(":4000", nil))
 }
 
+func getTitle(r *http.Request) (string, error) {
+	m := validPath.FindStringSubmatch(r.URL.Path)
+	if m == nil {
+		return "", fmt.Errorf("%s is an invalid route", r.URL.Path)
+	}
+	return m[2], nil
+}
+
 func viewHandler(w http.ResponseWriter, r *http.Request) {
-	title := r.URL.Path[len("/view/"):]
+	title, err := getTitle(r)
+	if err != nil {
+		renderError("not-found", w, err)
+		return
+	}
 	fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Viewing title: "+title)
 	p, err := LoadPage(title)
 	if err != nil {
@@ -32,8 +46,12 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request) {
-	title := r.URL.Path[len("/edit/"):]
-	if len(title) == 0 {
+	title, err := getTitle(r)
+	if err != nil {
+		renderError("not-found", w, err)
+		return
+	}
+	if title == "new" {
 		fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Editing New Page")
 		renderTemplate(w, "edit", &Page{})
 	} else {
@@ -47,7 +65,7 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request) {
-	title := r.URL.Path[len("/save/"):]
+	title, _ := getTitle(r)
 	if title == "" {
 		title = r.FormValue("title")
 	}

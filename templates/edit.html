@@ -7,12 +7,12 @@
 <form action="/save/{{.Title}}" method="post">
   {{if not .Title}}
   <div>
-    <label for="posttitle">Title:</label>
+    <label for="posttitle">Title:</label><br>
     <input type="text" id="posttitle" name="title">
   </div>
   {{end}}
   <div>
-    <label for="postbody">Content:</label>
+    <label for="postbody">Content:</label><br>
     <textarea id="postbody" name="body" rows="20" cols="80">
       {{printf "%s" .Body}}
     </textarea>
