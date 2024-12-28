@@ -33,20 +33,34 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 
 func editHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Path[len("/edit/"):]
-	fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Editing title: "+title)
-	p, err := LoadPage(title)
-	if err != nil {
-		p = &Page{Title: title}
+	if len(title) == 0 {
+		fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Editing New Page")
+		renderTemplate(w, "edit", &Page{})
+	} else {
+		fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Editing title: "+title)
+		p, err := LoadPage(title)
+		if err != nil {
+			p = &Page{Title: title}
+		}
+		renderTemplate(w, "edit", p)
 	}
-	renderTemplate(w, "edit", p)
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Path[len("/save/"):]
+	if title == "" {
+		title = r.FormValue("title")
+	}
 	fmt.Fprintf(os.Stdout, "[INFO] %s\n", "Saving title: "+title)
 	body := r.FormValue("body")
 	p := &Page{Title: title, Body: []byte(body)}
-	err := p.Save()
+	err := p.Validate()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[ERROR] Failed to save page: %s\n", err.Error())
+		renderError("bad-request", w, err)
+		return
+	}
+	err = p.Save()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[ERROR] Failed to save page: %s\n", err.Error())
 		renderError("internal-error", w, err)
@@ -68,6 +82,7 @@ func renderError(name string, w http.ResponseWriter, e error) {
 	var responseCodes map[string]int = map[string]int{
 		"not-found":      http.StatusNotFound,
 		"internal-error": http.StatusInternalServerError,
+		"bad-request":    http.StatusBadRequest,
 	}
 	status, ok := responseCodes[name]
 	if !ok {

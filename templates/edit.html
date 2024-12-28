@@ -1,12 +1,23 @@
+{{if .Title}}
 <h1>Editing {{.Title}}</h1>
+{{else}}
+<h1>Creating New Page</h1>
+{{end}}
 
 <form action="/save/{{.Title}}" method="post">
+  {{if not .Title}}
   <div>
-    <textarea name="body" id="postbody" rows="20" cols="80">
+    <label for="posttitle">Title:</label>
+    <input type="text" id="posttitle" name="title">
+  </div>
+  {{end}}
+  <div>
+    <label for="postbody">Content:</label>
+    <textarea id="postbody" name="body" rows="20" cols="80">
       {{printf "%s" .Body}}
     </textarea>
   </div>
   <div>
-    <input type="submit" value="save">
+    <button type="submit">Save</button>
   </div>
 </form>

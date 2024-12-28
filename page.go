@@ -1,6 +1,10 @@
 package main
 
-import "os"
+import (
+	"fmt"
+	"os"
+	"strings"
+)
 
 type Page struct {
 	Title string
@@ -19,4 +23,16 @@ func LoadPage(title string) (*Page, error) {
 		return nil, err
 	}
 	return &Page{Title: title, Body: body}, nil
+}
+
+func (p *Page) Validate() error {
+	title := strings.TrimSpace(p.Title)
+	if len(title) == 0 {
+		return fmt.Errorf("Page Title cannot be empty")
+	}
+	body := strings.TrimSpace(string(p.Body))
+	if len(body) == 0 {
+		return fmt.Errorf("Page Body cannot be empty")
+	}
+	return nil
 }
